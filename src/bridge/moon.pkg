@@ -2,4 +2,7 @@ import {
   "moon_orbit/src/parser" @parser,
   "moon_orbit/src/graph" @graph,
   "moon_orbit/src/layout" @layout,
+  "moonbitlang/core/json" @json,
 }
+
+pkgtype(kind: "foreign_library")

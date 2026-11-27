@@ -4,6 +4,12 @@ package "moon_orbit/src/bridge"
 // Values
 pub fn bridge_status() -> String
 
+pub fn compute_workspace_json(String) -> String
+
+pub fn get_sample_notes_json() -> String
+
+pub fn render_markdown_json(String) -> String
+
 // Errors
 
 // Types and methods

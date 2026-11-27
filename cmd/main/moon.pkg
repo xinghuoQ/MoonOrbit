@@ -1,0 +1,5 @@
+import {
+  "moon_orbit/src/bridge" @bridge,
+}
+
+pkgtype(kind: "executable")

@@ -37,6 +37,7 @@ const state = {
   graphSignature: null,
   tagCache: new Map(),
   allTags: [],
+  tagCounts: new Map(),
   activeTag: '',
   tagMatches: null,
   selectedFolder: DEFAULT_FOLDER,
@@ -739,9 +740,22 @@ function renderTagBar() {
     chip.type = 'button';
     const isActive = state.activeTag === tag;
     chip.className = `tag-chip${isActive ? ' is-active' : ''}`;
-    chip.textContent = `#${tag}`;
     chip.title = `按标签 #${tag} 筛选（再次点击取消）`;
     chip.setAttribute('aria-pressed', String(isActive));
+
+    const label = document.createElement('span');
+    label.className = 'tag-chip-label';
+    label.textContent = `#${tag}`;
+    chip.appendChild(label);
+
+    const count = state.tagCounts.get(tag) || 0;
+    if (count > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'tag-chip-count';
+      badge.textContent = String(count);
+      chip.appendChild(badge);
+    }
+
     chip.addEventListener('click', () => setActiveTag(tag));
     fragment.appendChild(chip);
   }
@@ -783,6 +797,15 @@ function refreshQueryState() {
     return;
   }
   state.allTags = Array.isArray(data.tags) ? data.tags : [];
+  const counts = new Map();
+  if (Array.isArray(data.tag_counts)) {
+    for (const entry of data.tag_counts) {
+      if (entry && typeof entry.tag === 'string') {
+        counts.set(entry.tag, Number(entry.count) || 0);
+      }
+    }
+  }
+  state.tagCounts = counts;
   state.tagMatches = state.activeTag
     ? new Set(Array.isArray(data.matches) ? data.matches : [])
     : null;

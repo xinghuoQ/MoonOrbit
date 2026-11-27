@@ -614,9 +614,9 @@ var _M0FP311moon__orbit3src6bridge18compute__workspaceN6constrS3113 = new _M0DTP
 var _M0FP311moon__orbit3src6bridge18compute__workspaceN6constrS3114 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("field \"notes\" must be an array");
 var _M0FP311moon__orbit3src6bridge18compute__workspaceN6constrS3115 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("missing required field \"notes\"");
 var _M0MPC16string6String4trimN6recordS1060 = new _M0TPC16string10StringView("\t\n\r ", 0, 4);
-var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3192 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("request must be a JSON object");
-var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3193 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("field \"notes\" must be an array");
-var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3194 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("missing required field \"notes\"");
+var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3201 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("request must be a JSON object");
+var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3202 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("field \"notes\" must be an array");
+var _M0FP311moon__orbit3src6bridge12query__notesN6constrS3203 = new _M0DTPB6ResultGRPC14json4JsonsE3Err("missing required field \"notes\"");
 function _M0MPC16string10StringView12unsafe__view(self, start, end) {
   return new _M0TPC16string10StringView(self.str, self.start + start | 0, self.start + end | 0);
 }
@@ -10942,6 +10942,28 @@ function _M0FP311moon__orbit3src6bridge18notes__contain__id(notes, id) {
   }
   return false;
 }
+function _M0FP311moon__orbit3src6bridge21tag__counts__to__json(store, tags) {
+  const items = new _M0TPB5ArrayGRPC14json4JsonE([], 0);
+  let i = 0;
+  while (true) {
+    if (i < tags.len) {
+      const _bind = i;
+      if (_bind < 0 || _bind >= tags.len) {
+        $panic();
+      }
+      const tag = tags.buf[_bind];
+      const _bind$2 = [{ _0: "tag", _1: new _M0DTPC14json4Json6String(tag) }, { _0: "count", _1: _M0IPC13int3IntPC14json6ToJson8to__json(_M0MP311moon__orbit3src5graph9NoteStore19get__notes__by__tag(store, tag).len) }];
+      const _p = _M0MPB3Map3MapGsRPC14json4JsonE(new _M0TPB9ArrayViewGUsRPC14json4JsonEE(_bind$2, 0, 2), undefined);
+      const item = new _M0DTPC14json4Json6Object(_p);
+      _M0MPC15array5Array4pushGRP311moon__orbit3src5graph9TagRecordE(items, item);
+      i = i + 1 | 0;
+      continue;
+    } else {
+      break;
+    }
+  }
+  return new _M0DTPC14json4Json5Array(items);
+}
 function _M0FP311moon__orbit3src6bridge12query__notes(request_json) {
   let root;
   let _try_err;
@@ -10965,12 +10987,12 @@ function _M0FP311moon__orbit3src6bridge12query__notes(request_json) {
     const _Object = root;
     request = _Object._0;
   } else {
-    return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3192;
+    return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3201;
   }
   const _bind = _M0MPB3Map3getGsRPC14json4JsonE(request, "notes");
   let note_items;
   if (_bind === undefined) {
-    return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3194;
+    return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3203;
   } else {
     const _Some = _bind;
     const _x = _Some;
@@ -10978,7 +11000,7 @@ function _M0FP311moon__orbit3src6bridge12query__notes(request_json) {
       const _Array = _x;
       note_items = _Array._0;
     } else {
-      return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3193;
+      return _M0FP311moon__orbit3src6bridge12query__notesN6constrS3202;
     }
   }
   const _bind$2 = _M0FP311moon__orbit3src6bridge16optional__string(request, "query", "");
@@ -11055,8 +11077,9 @@ function _M0FP311moon__orbit3src6bridge12query__notes(request_json) {
     }
     matches = filtered;
   }
-  const _bind$5 = [{ _0: "ok", _1: _M0DTPC14json4Json4True__ }, { _0: "error", _1: _M0FPC14json4null }, { _0: "matches", _1: _M0FP311moon__orbit3src6bridge19note__ids__to__json(matches) }, { _0: "tags", _1: _M0FP311moon__orbit3src6bridge17strings__to__json(_M0MP311moon__orbit3src5graph9NoteStore10list__tags(store)) }];
-  const _p = _M0MPB3Map3MapGsRPC14json4JsonE(new _M0TPB9ArrayViewGUsRPC14json4JsonEE(_bind$5, 0, 4), undefined);
+  const tags = _M0MP311moon__orbit3src5graph9NoteStore10list__tags(store);
+  const _bind$5 = [{ _0: "ok", _1: _M0DTPC14json4Json4True__ }, { _0: "error", _1: _M0FPC14json4null }, { _0: "matches", _1: _M0FP311moon__orbit3src6bridge19note__ids__to__json(matches) }, { _0: "tags", _1: _M0FP311moon__orbit3src6bridge17strings__to__json(tags) }, { _0: "tag_counts", _1: _M0FP311moon__orbit3src6bridge21tag__counts__to__json(store, tags) }];
+  const _p = _M0MPB3Map3MapGsRPC14json4JsonE(new _M0TPB9ArrayViewGUsRPC14json4JsonEE(_bind$5, 0, 5), undefined);
   return new _M0DTPB6ResultGRPC14json4JsonsE2Ok(new _M0DTPC14json4Json6Object(_p));
 }
 function _M0FP311moon__orbit3src6bridge18query__notes__json(request_json) {

@@ -294,14 +294,16 @@ ul {
 }
 
 .tag-chip {
+  display: inline-flex;
   max-width: 100%;
+  align-items: center;
+  gap: 4px;
   padding: 2px 9px;
   overflow: hidden;
   color: #6f6656;
   font-size: 10.5px;
   font-weight: 600;
   white-space: nowrap;
-  text-overflow: ellipsis;
   background: #f4efe5;
   border: 1px solid #e9e2d5;
   border-radius: var(--radius-pill);
@@ -309,6 +311,28 @@ ul {
     background var(--duration-fast) ease,
     border-color var(--duration-fast) ease,
     box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.tag-chip-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag-chip-count {
+  flex: 0 0 auto;
+  padding: 0 4px;
+  color: #8c8272;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.5;
+  background: #eae3d6;
+  border-radius: var(--radius-pill);
+}
+
+.tag-chip.is-active .tag-chip-count {
+  color: #2f63e8;
+  background: #fff;
 }
 
 .tag-chip:hover {

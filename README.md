@@ -4,7 +4,7 @@
 
 **A dual-link Markdown editor and local graph engine powered by MoonBit 1.0.**
 
-`MoonBit 1.0` · `192 unit tests` · `MIT License` · `Zero npm dependencies`
+`MoonBit 1.0` · `194 unit tests` · `MIT License` · `Zero npm dependencies`
 
 ---
 
@@ -43,7 +43,7 @@ The architecture is **heavy MoonBit core + light web shell**: Markdown rendering
 | Markdown 渲染 | H1–H6、粗体、斜体、行内代码、代码块、列表、引用、普通链接 |
 | 双链 | `[[目标笔记]]`、`[[目标笔记\|显示别名]]`，预览中可直接点击 |
 | 标签 | `#moonbit`、`#工作/计划`，显示在笔记列表与图谱节点数据中 |
-| 标签筛选 | 左栏胶囊栏列出全库标签，点击调用 MoonBit `query_notes_json` 筛选文档 |
+| 标签筛选 | 左栏胶囊栏列出全库标签及文档数量，点击调用 MoonBit `query_notes_json` 筛选文档 |
 | 反向链接 | 谁引用了当前笔记，实时计算并展示为中栏底部胶囊 |
 | 未创建链接 | 被引用但尚未创建的标题，左侧一键创建 |
 | 文件夹树 | `📁 文件夹` 可折叠，文档显示为 `📄 标题.md` 并带标签数量徽章 |
@@ -62,7 +62,7 @@ The architecture is **heavy MoonBit core + light web shell**: Markdown rendering
 | Markdown | Headings H1–H6, bold, italic, inline code, fenced code, lists, quotes, links |
 | Wikilinks | `[[Target]]` and `[[Target\|alias]]`, clickable in the preview |
 | Tags | `#moonbit`, `#work/plan`, surfaced in the vault list and graph data |
-| Tag filter | A capsule bar lists every vault tag; clicking calls MoonBit `query_notes_json` to filter documents |
+| Tag filter | A capsule bar lists every vault tag with its document count; clicking calls MoonBit `query_notes_json` to filter documents |
 | Backlinks | Every note that references the active note, computed live |
 | Unresolved links | Referenced-but-missing titles, creatable in one click |
 | Folder tree | Collapsible `📁 folders`, `📄 title.md` documents and per-note tag badges |
@@ -219,11 +219,26 @@ The center node is pinned to the canvas center with `14 / 9 / 7` dot radii for h
   "ok": true,
   "error": null,
   "matches": ["local-graph"],
-  "tags": ["markdown", "moonbit", "moonorbit", "分类", "双链", "可视化", "图谱", "工作/计划", "指南", "标签", "知识管理", "语法", "语言"]
+  "tags": ["markdown", "moonbit", "moonorbit", "分类", "双链", "可视化", "图谱", "工作/计划", "指南", "标签", "知识管理", "语法", "语言"],
+  "tag_counts": [
+    { "tag": "markdown", "count": 1 },
+    { "tag": "moonbit", "count": 1 },
+    { "tag": "moonorbit", "count": 1 },
+    { "tag": "分类", "count": 1 },
+    { "tag": "双链", "count": 1 },
+    { "tag": "可视化", "count": 1 },
+    { "tag": "图谱", "count": 1 },
+    { "tag": "工作/计划", "count": 1 },
+    { "tag": "指南", "count": 1 },
+    { "tag": "标签", "count": 1 },
+    { "tag": "知识管理", "count": 1 },
+    { "tag": "语法", "count": 1 },
+    { "tag": "语言", "count": 1 }
+  ]
 }
 ```
 
-`query` 与 `tag` 都是可选字段并用 AND 组合；`query` 对标题、正文、文件夹做不区分大小写的匹配，`tag` 接受 `work` 或 `#work` 两种写法。`matches` 保持笔记库插入顺序，`tags` 返回全库去重排序后的标签。
+`query` 与 `tag` 都是可选字段并用 AND 组合；`query` 对标题、正文、文件夹做不区分大小写的匹配，`tag` 接受 `work` 或 `#work` 两种写法。`matches` 保持笔记库插入顺序，`tags` 返回全库去重排序后的标签，`tag_counts` 提供每个标签对应的文档数量。
 
 任何非法输入都返回 `{"ok": false, "error": "…"}`，不会有异常逃逸到 JavaScript。
 
@@ -252,24 +267,24 @@ Four stable web APIs plus one legacy smoke-test entry. Each note may carry an op
 
 **中文**
 
-当前 **192 个单元测试全部通过**，覆盖四个包：
+当前 **194 个单元测试全部通过**，覆盖四个包：
 
 - `src/parser`：块级与行内 Markdown、转义、别名双链、标签边界、CRLF。
 - `src/graph`：笔记增删改、反链、幽灵节点、深度截断、BFS 跳数、排序稳定性、`folder` 存储/更新/移动、全文搜索与标签筛选。
 - `src/layout`：中心固定、14/9/7 半径、内外圈半径、节点不重叠、标签宽度估算、竖屏拉伸、异常画布回退、确定性。
-- `src/bridge`：JSON 往返、`folder`/`folders` 往返、`query_notes_json` 关键词/标签/交集查询、错误信封、示例库完整性。
+- `src/bridge`：JSON 往返、`folder`/`folders` 往返、`query_notes_json` 关键词/标签/交集查询与标签计数、错误信封、示例库完整性。
 
 ```bash
 $ moon check --deny-warn
 Finished. moon: no work to do
 
 $ moon test
-Total tests: 192, passed: 192, failed: 0.
+Total tests: 194, passed: 194, failed: 0.
 ```
 
 **English**
 
-All **192 unit tests pass**, covering the parser (blocks, inline syntax, escaping, aliases, tag boundaries, CRLF), the graph store (mutation, backlinks, ghost ids, depth clamping, BFS hops, deterministic sorting, folder storage/moves, full-text search and tag filters), layout (center pinning, 14/9/7 radii, ring radii, non-overlap, label-width clearance, portrait stretching, invalid-canvas fallback, determinism) and the JSON bridge (folder round-trips, keyword/tag/intersection queries, error envelope, sample vault).
+All **194 unit tests pass**, covering the parser (blocks, inline syntax, escaping, aliases, tag boundaries, CRLF), the graph store (mutation, backlinks, ghost ids, depth clamping, BFS hops, deterministic sorting, folder storage/moves, full-text search and tag filters), layout (center pinning, 14/9/7 radii, ring radii, non-overlap, label-width clearance, portrait stretching, invalid-canvas fallback, determinism) and the JSON bridge (folder round-trips, keyword/tag/intersection queries, per-tag counts, error envelope, sample vault).
 
 ---
 

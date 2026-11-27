@@ -700,18 +700,54 @@ fn string_array_text(items : Array[Json]) -> String {
 }
 
 ///|
+fn find_tag_count(items : Array[Json], tag : String) -> Int {
+  let mut i = 0
+  while i < items.length() {
+    let entry = as_object(items[i])
+    if as_string(field(entry, "tag")) == tag {
+      return as_int(field(entry, "count"))
+    }
+    i += 1
+  }
+  abort("tag count not found: " + tag)
+}
+
+///|
 test "query_notes_json returns matches and the whole vault tag list" {
   let response = as_object(
     parse_json(query_notes_json(query_request("alpha", ""))),
   )
   assert_true(as_bool(field(response, "ok")))
   assert_true(is_null(field(response, "error")))
-  assert_eq(response.length(), 4)
+  assert_eq(response.length(), 5)
   assert_eq(string_array_text(as_array(field(response, "matches"))), "a")
   assert_eq(
     string_array_text(as_array(field(response, "tags"))),
     "misc,plan,work",
   )
+}
+
+///|
+test "query_notes_json reports per-tag counts" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", ""))),
+  )
+  let counts = as_array(field(response, "tag_counts"))
+  assert_eq(counts.length(), 3)
+  assert_eq(find_tag_count(counts, "work"), 2)
+  assert_eq(find_tag_count(counts, "plan"), 1)
+  assert_eq(find_tag_count(counts, "misc"), 1)
+}
+
+///|
+test "query_notes_json keeps every tag count while filtering" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", "work"))),
+  )
+  let counts = as_array(field(response, "tag_counts"))
+  assert_eq(counts.length(), 3)
+  assert_eq(find_tag_count(counts, "work"), 2)
+  assert_eq(find_tag_count(counts, "misc"), 1)
 }
 
 ///|

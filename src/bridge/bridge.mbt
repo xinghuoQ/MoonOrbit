@@ -507,6 +507,28 @@ fn notes_contain_id(notes : Array[@graph.Note], id : String) -> Bool {
 }
 
 ///|
+/// Build `[{tag,count}, ...]` for every vault tag, preserving the sorted tag
+/// order returned by the graph store. The web shell uses these counts as small
+/// badges inside the filter capsules.
+fn tag_counts_to_json(
+  store : @graph.NoteStore,
+  tags : Array[String],
+) -> Json {
+  let items : Array[Json] = []
+  let mut i = 0
+  while i < tags.length() {
+    let tag = tags[i]
+    let item : Json = {
+      "tag": tag,
+      "count": store.get_notes_by_tag(tag).length(),
+    }
+    items.push(item)
+    i += 1
+  }
+  Json::array(items)
+}
+
+///|
 /// Decode and execute one vault query.
 ///
 /// `query` and `tag` are optional and combine with AND. An empty query keeps
@@ -561,11 +583,13 @@ fn query_notes(request_json : String) -> Result[Json, String] {
     filtered
   }
 
+  let tags = store.list_tags()
   Ok({
     "ok": true,
     "error": @json.null,
     "matches": note_ids_to_json(matches),
-    "tags": strings_to_json(store.list_tags()),
+    "tags": strings_to_json(tags),
+    "tag_counts": tag_counts_to_json(store, tags),
   })
 }
 
@@ -578,10 +602,11 @@ fn query_notes(request_json : String) -> Result[Json, String] {
 /// `#tag` spelling.
 ///
 /// The response is
-/// `{"ok":true,"error":null,"matches":["id",...],"tags":["tag",...]}`, where
-/// `matches` preserves vault insertion order and `tags` lists every distinct
-/// tag in the vault, sorted. Malformed input returns the standard failure
-/// envelope and never panics.
+/// `{"ok":true,"error":null,"matches":["id",...],"tags":["tag",...],
+/// "tag_counts":[{"tag":"...","count":1},...]}`, where `matches` preserves
+/// vault insertion order and `tags` lists every distinct tag in the vault,
+/// sorted. `tag_counts` reports how many notes carry each tag. Malformed input
+/// returns the standard failure envelope and never panics.
 #export_name("query_notes_json")
 pub fn query_notes_json(request_json : String) -> String {
   match query_notes(request_json) {

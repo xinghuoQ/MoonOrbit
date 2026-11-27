@@ -8,6 +8,8 @@ pub fn compute_workspace_json(String) -> String
 
 pub fn get_sample_notes_json() -> String
 
+pub fn query_notes_json(String) -> String
+
 pub fn render_markdown_json(String) -> String
 
 // Errors

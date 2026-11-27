@@ -478,6 +478,119 @@ pub fn compute_workspace_json(request_json : String) -> String {
 }
 
 // ---------------------------------------------------------------------------
+// Vault query API (search + tag filter)
+// ---------------------------------------------------------------------------
+
+///|
+/// Convert matched notes into the compact id array the shell needs for
+/// filtering its folder tree.
+fn note_ids_to_json(notes : Array[@graph.Note]) -> Json {
+  let ids : Array[String] = []
+  let mut i = 0
+  while i < notes.length() {
+    ids.push(notes[i].id)
+    i += 1
+  }
+  strings_to_json(ids)
+}
+
+///|
+fn notes_contain_id(notes : Array[@graph.Note], id : String) -> Bool {
+  let mut i = 0
+  while i < notes.length() {
+    if notes[i].id == id {
+      return true
+    }
+    i += 1
+  }
+  false
+}
+
+///|
+/// Decode and execute one vault query.
+///
+/// `query` and `tag` are optional and combine with AND. An empty query keeps
+/// every note, so a tag-only filter is just the tag result in insertion order.
+fn query_notes(request_json : String) -> Result[Json, String] {
+  let root = @json.parse(request_json) catch {
+    (error : @json.ParseError) =>
+      return Err("invalid JSON: " + error.to_string())
+  }
+  let request = match root {
+    Object(obj) => obj
+    _ => return Err("request must be a JSON object")
+  }
+  let note_items = match request.get("notes") {
+    Some(Array(items)) => items
+    Some(_) => return Err("field \"notes\" must be an array")
+    None => return Err("missing required field \"notes\"")
+  }
+  let query_text = match optional_string(request, "query", "") {
+    Ok(value) => value
+    Err(message) => return Err(message)
+  }
+  let tag_text = match optional_string(request, "tag", "") {
+    Ok(value) => value
+    Err(message) => return Err(message)
+  }
+  let notes = match decode_notes(note_items) {
+    Ok(value) => value
+    Err(message) => return Err(message)
+  }
+
+  let store = @graph.NoteStore::new()
+  let mut i = 0
+  while i < notes.length() {
+    store.upsert_note(notes[i])
+    i += 1
+  }
+
+  let searched = store.search_notes(query_text)
+  let matches : Array[@graph.Note] = if tag_text.trim().to_owned() == "" {
+    searched
+  } else {
+    let tagged = store.get_notes_by_tag(tag_text)
+    let filtered : Array[@graph.Note] = []
+    let mut j = 0
+    while j < searched.length() {
+      if notes_contain_id(tagged, searched[j].id) {
+        filtered.push(searched[j])
+      }
+      j += 1
+    }
+    filtered
+  }
+
+  Ok({
+    "ok": true,
+    "error": @json.null,
+    "matches": note_ids_to_json(matches),
+    "tags": strings_to_json(store.list_tags()),
+  })
+}
+
+///|
+/// Filter the vault by keyword and/or tag.
+///
+/// The request is `{"notes":[...],"query":"...","tag":"..."}`; both filters
+/// are optional and combine with AND. `query` matches title, raw Markdown and
+/// folder name case-insensitively, while `tag` accepts the raw name or a
+/// `#tag` spelling.
+///
+/// The response is
+/// `{"ok":true,"error":null,"matches":["id",...],"tags":["tag",...]}`, where
+/// `matches` preserves vault insertion order and `tags` lists every distinct
+/// tag in the vault, sorted. Malformed input returns the standard failure
+/// envelope and never panics.
+#export_name("query_notes_json")
+pub fn query_notes_json(request_json : String) -> String {
+  match query_notes(request_json) {
+    Ok(payload) => payload.stringify()
+    Err(message) => failure_response(message).stringify()
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Built-in sample vault
 // ---------------------------------------------------------------------------
 

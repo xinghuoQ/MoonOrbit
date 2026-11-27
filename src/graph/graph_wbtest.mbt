@@ -558,3 +558,96 @@ test "moving a note between folders leaves links untouched" {
   assert_eq(note_ids_text(store.get_backlinks("b")), "a")
   assert_eq(join_strings(store.get_outgoing_links("a"), ","), "b")
 }
+
+// ---------------------------------------------------------------------------
+// Full-text search and tag filters
+// ---------------------------------------------------------------------------
+
+///|
+fn make_search_store() -> NoteStore {
+  let store = NoteStore::new()
+  store.upsert_note(
+    Note::with_folder("a", "Alpha Guide", "hello world", "Work"),
+  )
+  store.upsert_note(
+    Note::with_folder("b", "Beta Notes", "MoonBit rocks", "Home"),
+  )
+  store.upsert_note(Note::with_folder("c", "Gamma", "nothing here", ""))
+  store
+}
+
+///|
+fn make_tag_store() -> NoteStore {
+  let store = NoteStore::new()
+  store.upsert_note(Note::new("a", "A", "#work #plan"))
+  store.upsert_note(Note::new("b", "B", "#WORK"))
+  store.upsert_note(Note::new("c", "C", "#misc"))
+  store
+}
+
+///|
+test "search_notes matches titles case-insensitively" {
+  let store = make_search_store()
+  assert_eq(note_ids_text(store.search_notes("ALPHA")), "a")
+  assert_eq(note_ids_text(store.search_notes("alpha")), "a")
+}
+
+///|
+test "search_notes matches content case-insensitively" {
+  let store = make_search_store()
+  assert_eq(note_ids_text(store.search_notes("moonbit ROCKS")), "b")
+}
+
+///|
+test "search_notes matches folder names case-insensitively" {
+  let store = make_search_store()
+  assert_eq(note_ids_text(store.search_notes("work")), "a")
+}
+
+///|
+test "search_notes empty query returns every note in insertion order" {
+  let store = make_search_store()
+  assert_eq(note_ids_text(store.search_notes("")), "a,b,c")
+  assert_eq(note_ids_text(store.search_notes("   ")), "a,b,c")
+}
+
+///|
+test "search_notes trims surrounding whitespace" {
+  let store = make_search_store()
+  assert_eq(note_ids_text(store.search_notes("  beta  ")), "b")
+}
+
+///|
+test "search_notes returns nothing for an unknown term" {
+  let store = make_search_store()
+  assert_eq(store.search_notes("does-not-exist").length(), 0)
+}
+
+///|
+test "get_notes_by_tag returns only matching notes" {
+  let store = make_tag_store()
+  assert_eq(note_ids_text(store.get_notes_by_tag("plan")), "a")
+  assert_eq(note_ids_text(store.get_notes_by_tag("work")), "a,b")
+}
+
+///|
+test "get_notes_by_tag accepts hash prefix and mixed case" {
+  let store = make_tag_store()
+  assert_eq(note_ids_text(store.get_notes_by_tag("#WORK")), "a,b")
+  assert_eq(note_ids_text(store.get_notes_by_tag("  #work  ")), "a,b")
+}
+
+///|
+test "get_notes_by_tag returns empty for blank or unknown tags" {
+  let store = make_tag_store()
+  assert_eq(store.get_notes_by_tag("").length(), 0)
+  assert_eq(store.get_notes_by_tag("#").length(), 0)
+  assert_eq(store.get_notes_by_tag("missing").length(), 0)
+}
+
+///|
+test "list_tags deduplicates and sorts every tag" {
+  let store = make_tag_store()
+  assert_eq(join_strings(store.list_tags(), ","), "WORK,misc,plan,work")
+  assert_eq(NoteStore::new().list_tags().length(), 0)
+}

@@ -42,13 +42,16 @@ pub struct NoteStore {
 pub fn NoteStore::get_backlinks(Self, String) -> Array[Note]
 pub fn NoteStore::get_local_graph(Self, String, Int32) -> LocalGraph
 pub fn NoteStore::get_note(Self, String) -> Note?
+pub fn NoteStore::get_notes_by_tag(Self, String) -> Array[Note]
 pub fn NoteStore::get_outgoing_links(Self, String) -> Array[String]
 pub fn NoteStore::get_unresolved_links(Self) -> Array[String]
 pub fn NoteStore::list_folders(Self) -> Array[String]
 pub fn NoteStore::list_notes(Self) -> Array[Note]
+pub fn NoteStore::list_tags(Self) -> Array[String]
 pub fn NoteStore::new() -> Self
 pub fn NoteStore::notes_in_folder(Self, String) -> Array[Note]
 pub fn NoteStore::remove_note(Self, String) -> Bool
+pub fn NoteStore::search_notes(Self, String) -> Array[Note]
 pub fn NoteStore::set_note_folder(Self, String, String) -> Bool
 pub fn NoteStore::upsert_note(Self, Note) -> Unit
 

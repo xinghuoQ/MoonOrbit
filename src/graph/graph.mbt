@@ -245,6 +245,90 @@ pub fn NoteStore::set_note_folder(
 }
 
 ///|
+/// Full-text search over the vault, case-insensitive.
+///
+/// `query` is trimmed first. An empty query returns every note in insertion
+/// order, which lets the shell render the whole vault without a special case.
+/// Matching checks the title, the raw Markdown content and the folder name, so
+/// searching for `"快速开始"` also finds documents inside that folder.
+pub fn NoteStore::search_notes(
+  self : NoteStore,
+  query : String,
+) -> Array[Note] {
+  let needle = query.trim().to_lower().to_owned()
+  let result : Array[Note] = []
+  let mut i = 0
+  while i < self.notes.length() {
+    let note = self.notes[i]
+    if needle == "" ||
+      note.title.to_lower().contains(needle) ||
+      note.content.to_lower().contains(needle) ||
+      note.folder.to_lower().contains(needle) {
+      result.push(note)
+    }
+    i += 1
+  }
+  result
+}
+
+///|
+/// Every note carrying `tag`, in insertion order.
+///
+/// Matching ignores a leading `#`, surrounding whitespace and ASCII case, so
+/// `"work"`, `"#work"` and `"WORK"` all select the same notes. A blank tag
+/// selects nothing.
+pub fn NoteStore::get_notes_by_tag(
+  self : NoteStore,
+  tag : String,
+) -> Array[Note] {
+  let needle = normalize_tag(tag)
+  let result : Array[Note] = []
+  if needle == "" {
+    return result
+  }
+  let mut i = 0
+  while i < self.notes.length() {
+    let note = self.notes[i]
+    let note_tags = tags_for(self, note.id)
+    let mut j = 0
+    let mut matched = false
+    while j < note_tags.length() && !matched {
+      if normalize_tag(note_tags[j]) == needle {
+        matched = true
+      }
+      j += 1
+    }
+    if matched {
+      result.push(note)
+    }
+    i += 1
+  }
+  result
+}
+
+///|
+/// Every distinct tag in the vault, sorted by code unit.
+///
+/// Tags are returned without the leading `#`; the shell adds presentation.
+pub fn NoteStore::list_tags(self : NoteStore) -> Array[String] {
+  let tags : Array[String] = []
+  let mut i = 0
+  while i < self.tags.length() {
+    let record = self.tags[i]
+    let mut j = 0
+    while j < record.tags.length() {
+      if !contains_string(tags, record.tags[j]) {
+        tags.push(record.tags[j])
+      }
+      j += 1
+    }
+    i += 1
+  }
+  sort_strings(tags)
+  tags
+}
+
+///|
 /// Target node ids referenced by the note `id`, in document order and
 /// deduplicated. Ghost targets use the `ghost:<title>` id form, with a
 /// numeric suffix when that id is already taken by a real note. Unknown note
@@ -517,6 +601,19 @@ fn find_note_by_title(notes : Array[Note], title : String) -> Note? {
     i += 1
   }
   None
+}
+
+///|
+/// Normalize a tag for comparisons: trim spacing, drop a leading `#` and
+/// lower-case ASCII letters. CJK tags are unaffected.
+fn normalize_tag(tag : String) -> String {
+  let trimmed = tag.trim().to_lower().to_owned()
+  if trimmed.length() > 0 &&
+    trimmed.get_char(0).unwrap_or('\u{0}') == '#' {
+    trimmed[1:trimmed.length()].to_owned()
+  } else {
+    trimmed
+  }
 }
 
 ///|

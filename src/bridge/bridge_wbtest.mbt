@@ -152,6 +152,19 @@ fn expect_failure(request : String) -> String raise {
   message
 }
 
+///|
+/// Same failure-envelope assertion for the vault query API.
+fn expect_query_failure(request : String) -> String raise {
+  let response = as_object(parse_json(query_notes_json(request)))
+  assert_false(as_bool(field(response, "ok")))
+  assert_eq(response.length(), 2)
+  let error = field(response, "error")
+  assert_false(is_null(error))
+  let message = as_string(error)
+  assert_true(message.length() > 0)
+  message
+}
+
 // ---------------------------------------------------------------------------
 // render_markdown_json
 // ---------------------------------------------------------------------------
@@ -652,5 +665,140 @@ test "compute_workspace_json rejects a non-string folders entry" {
     "{\"notes\":[],\"active_id\":\"a\",\"folders\":[42]}",
   )
   assert_true(message.contains("folders"))
+  assert_true(message.contains("must be a string"))
+}
+
+// ---------------------------------------------------------------------------
+// query_notes_json: keyword search and tag filter
+// ---------------------------------------------------------------------------
+
+///|
+fn query_vault_json() -> String {
+  "[{\"id\":\"a\",\"title\":\"Alpha Note\",\"content\":\"body #work #plan\",\"folder\":\"Work\"},{\"id\":\"b\",\"title\":\"Beta\",\"content\":\"hello #work\",\"folder\":\"Home\"},{\"id\":\"c\",\"title\":\"Gamma\",\"content\":\"nothing #misc\",\"folder\":\"\"}]"
+}
+
+///|
+fn query_request(query : String, tag : String) -> String {
+  "{\"notes\":" +
+  query_vault_json() +
+  ",\"query\":\"" +
+  query +
+  "\",\"tag\":\"" +
+  tag +
+  "\"}"
+}
+
+///|
+fn string_array_text(items : Array[Json]) -> String {
+  let values : Array[String] = []
+  let mut i = 0
+  while i < items.length() {
+    values.push(as_string(items[i]))
+    i += 1
+  }
+  join_strings(values, ",")
+}
+
+///|
+test "query_notes_json returns matches and the whole vault tag list" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("alpha", ""))),
+  )
+  assert_true(as_bool(field(response, "ok")))
+  assert_true(is_null(field(response, "error")))
+  assert_eq(response.length(), 4)
+  assert_eq(string_array_text(as_array(field(response, "matches"))), "a")
+  assert_eq(
+    string_array_text(as_array(field(response, "tags"))),
+    "misc,plan,work",
+  )
+}
+
+///|
+test "query_notes_json finds notes by folder name" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("HOME", ""))),
+  )
+  assert_eq(string_array_text(as_array(field(response, "matches"))), "b")
+}
+
+///|
+test "query_notes_json filters by tag" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", "work"))),
+  )
+  assert_eq(
+    string_array_text(as_array(field(response, "matches"))),
+    "a,b",
+  )
+}
+
+///|
+test "query_notes_json tag filter accepts hash prefix and mixed case" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", "#WORK"))),
+  )
+  assert_eq(
+    string_array_text(as_array(field(response, "matches"))),
+    "a,b",
+  )
+}
+
+///|
+test "query_notes_json intersects keyword and tag filters" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("beta", "work"))),
+  )
+  assert_eq(string_array_text(as_array(field(response, "matches"))), "b")
+  let empty = as_object(
+    parse_json(query_notes_json(query_request("alpha", "misc"))),
+  )
+  assert_eq(as_array(field(empty, "matches")).length(), 0)
+}
+
+///|
+test "query_notes_json with no filters returns every note" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", ""))),
+  )
+  assert_eq(
+    string_array_text(as_array(field(response, "matches"))),
+    "a,b,c",
+  )
+  assert_eq(as_array(field(response, "tags")).length(), 3)
+}
+
+///|
+test "query_notes_json unknown tag keeps the tag list visible" {
+  let response = as_object(
+    parse_json(query_notes_json(query_request("", "missing"))),
+  )
+  assert_eq(as_array(field(response, "matches")).length(), 0)
+  assert_eq(as_array(field(response, "tags")).length(), 3)
+}
+
+///|
+test "query_notes_json rejects invalid JSON" {
+  let message = expect_query_failure("{not valid json")
+  assert_true(message.contains("invalid JSON"))
+}
+
+///|
+test "query_notes_json requires notes" {
+  let message = expect_query_failure("{\"query\":\"x\"}")
+  assert_true(message.contains("notes"))
+}
+
+///|
+test "query_notes_json rejects a non-string query" {
+  let message = expect_query_failure("{\"notes\":[],\"query\":7}")
+  assert_true(message.contains("query"))
+  assert_true(message.contains("must be a string"))
+}
+
+///|
+test "query_notes_json rejects a non-string tag" {
+  let message = expect_query_failure("{\"notes\":[],\"tag\":7}")
+  assert_true(message.contains("tag"))
   assert_true(message.contains("must be a string"))
 }

@@ -1,12 +1,47 @@
 // Generated using `moon info`, DON'T EDIT IT
 package "moon_orbit/src/layout"
 
+import {
+  "moon_orbit/src/graph",
+}
+
 // Values
+pub fn compute_layout(@graph.LocalGraph, Double, Double) -> GraphLayout
+
+pub fn has_node_overlap(GraphLayout) -> Bool
+
 pub fn layout_status() -> String
 
 // Errors
 
 // Types and methods
+pub struct GraphLayout {
+  center_id : String
+  width : Double
+  height : Double
+  nodes : Array[PositionedNode]
+  edges : Array[LayoutEdge]
+}
+
+pub struct LayoutEdge {
+  source : String
+  target : String
+  x1 : Double
+  y1 : Double
+  x2 : Double
+  y2 : Double
+}
+
+pub struct PositionedNode {
+  id : String
+  title : String
+  exists : Bool
+  hop : Int32
+  tags : Array[String]
+  x : Double
+  y : Double
+  radius : Double
+}
 
 // Type aliases
 

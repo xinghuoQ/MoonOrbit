@@ -64,19 +64,22 @@ const DEFAULT_CANVAS_HEIGHT : Double = 400.0
 
 ///|
 /// Visual radius of the center node.
-const CENTER_NODE_RADIUS : Double = 22.0
+///
+/// Obsidian-style rendering keeps the dot small and puts the readable title
+/// below it instead of squeezing text inside the circle.
+const CENTER_NODE_RADIUS : Double = 14.0
 
 ///|
 /// Visual radius of first-hop nodes (inner orbit).
-const HOP1_NODE_RADIUS : Double = 16.0
+const HOP1_NODE_RADIUS : Double = 9.0
 
 ///|
 /// Visual radius of second-hop nodes (outer orbit).
-const HOP2_NODE_RADIUS : Double = 13.0
+const HOP2_NODE_RADIUS : Double = 7.0
 
 ///|
 /// Minimum gap left between two node circles.
-const NODE_GAP : Double = 4.0
+const NODE_GAP : Double = 6.0
 
 ///|
 /// Maximum safe border kept free around the orbit so nodes and labels are
@@ -94,6 +97,41 @@ const INNER_RING_RATIO : Double = 0.48
 ///|
 /// Outer orbit ratio when both hop levels are present.
 const OUTER_RING_RATIO : Double = 0.90
+
+///|
+/// Gap between the bottom of a node circle and the top of its label.
+const LABEL_GAP : Double = 5.0
+
+///|
+/// Approximate rendered height of one label line, used as vertical clearance
+/// when two orbits sit close together.
+const LABEL_HEIGHT : Double = 15.0
+
+///|
+/// Approximate advance width of one Latin character at the graph label size.
+const LABEL_LATIN_WIDTH : Double = 6.0
+
+///|
+/// Approximate advance width of one CJK / full-width character.
+const LABEL_CJK_WIDTH : Double = 12.0
+
+///|
+/// Smallest label allowance; two short labels still get breathing room.
+const LABEL_MIN_WIDTH : Double = 22.0
+
+///|
+/// Largest label allowance. Extremely long titles are capped so one label
+/// cannot push the whole orbit off the canvas.
+const LABEL_MAX_WIDTH : Double = 96.0
+
+///|
+/// Extra horizontal gap demanded between two neighbouring labels.
+const LABEL_HORIZONTAL_GAP : Double = 6.0
+
+///|
+/// Maximum vertical stretch applied to orbital radii on portrait canvases.
+/// The vertical radius never exceeds the usable vertical space.
+const MAX_VERTICAL_FLEX : Double = 1.6
 
 // ---------------------------------------------------------------------------
 // Public layout engine
@@ -147,17 +185,40 @@ pub fn compute_layout(
   let inner_count = inner_nodes.length()
   let outer_count = outer_nodes.length()
 
-  // Usable orbit radius: half of the short side minus the safety margin.
+  // Usable orbit space per axis. The circular radius is bounded by the
+  // tighter axis, while a portrait canvas gets an extra vertical radius so
+  // nodes use the tall space instead of huddling in a narrow column.
   let short_side = if canvas_width < canvas_height {
     canvas_width
   } else {
     canvas_height
   }
   let margin = canvas_margin(short_side)
-  let mut available = short_side / 2.0 - margin
-  if available < 0.0 {
-    available = 0.0
+  let mut avail_x = canvas_width / 2.0 - margin
+  let mut avail_y = canvas_height / 2.0 - margin
+  if avail_x < 0.0 {
+    avail_x = 0.0
   }
+  if avail_y < 0.0 {
+    avail_y = 0.0
+  }
+  let available = if avail_x < avail_y { avail_x } else { avail_y }
+  let vertical_flex : Double = if canvas_height > canvas_width &&
+    avail_x > 0.0 {
+    let ratio = avail_y / avail_x
+    if ratio > MAX_VERTICAL_FLEX {
+      MAX_VERTICAL_FLEX
+    } else {
+      ratio
+    }
+  } else {
+    1.0
+  }
+
+  // Labels sit below the dots, so each ring reserves the widest label among
+  // its own nodes when enforcing the minimum chord between neighbours.
+  let inner_label_width = max_label_width(inner_nodes)
+  let outer_label_width = max_label_width(outer_nodes)
 
   let inner_radii : Array[Double] = []
   let outer_radii : Array[Double] = []
@@ -174,12 +235,17 @@ pub fn compute_layout(
         available * OUTER_RING_RATIO,
         outer_cap,
         HOP2_NODE_RADIUS,
+        outer_label_width,
       ),
     )
     let outer_min = min_of(outer_radii)
     let radii_sum = HOP1_NODE_RADIUS + HOP2_NODE_RADIUS
-    let preferred_gap = radii_sum + NODE_GAP
-    let center_safe_radius = CENTER_NODE_RADIUS + HOP1_NODE_RADIUS + NODE_GAP
+    let preferred_gap = radii_sum + LABEL_HEIGHT + LABEL_GAP + NODE_GAP
+    let center_safe_radius = CENTER_NODE_RADIUS +
+      HOP1_NODE_RADIUS +
+      LABEL_HEIGHT +
+      LABEL_GAP +
+      NODE_GAP
     let mut cross_cap = outer_min - preferred_gap
     // On very tight canvases the preferred gap can squeeze the inner orbit
     // down to the point where it touches the center node. Trade part of the
@@ -205,6 +271,7 @@ pub fn compute_layout(
         available * INNER_RING_RATIO,
         inner_cap,
         HOP1_NODE_RADIUS,
+        inner_label_width,
       ),
     )
     // Half-step phase shift keeps outer nodes from lining up radially with
@@ -219,6 +286,7 @@ pub fn compute_layout(
         available * SINGLE_RING_RATIO,
         inner_cap,
         HOP1_NODE_RADIUS,
+        inner_label_width,
       ),
     )
   } else if outer_count > 0 {
@@ -230,6 +298,7 @@ pub fn compute_layout(
         available * SINGLE_RING_RATIO,
         outer_cap,
         HOP2_NODE_RADIUS,
+        outer_label_width,
       ),
     )
   }
@@ -260,7 +329,7 @@ pub fn compute_layout(
       positioned(
         inner_nodes[inner_index],
         center_x + radius * @math.cos(angle),
-        center_y + radius * @math.sin(angle),
+        center_y + radius * vertical_flex * @math.sin(angle),
         HOP1_NODE_RADIUS,
       ),
     )
@@ -277,7 +346,7 @@ pub fn compute_layout(
       positioned(
         outer_nodes[outer_index],
         center_x + radius * @math.cos(angle),
-        center_y + radius * @math.sin(angle),
+        center_y + radius * vertical_flex * @math.sin(angle),
         HOP2_NODE_RADIUS,
       ),
     )
@@ -354,6 +423,51 @@ pub fn has_node_overlap(layout : GraphLayout) -> Bool {
 // ---------------------------------------------------------------------------
 
 ///|
+/// Estimate the rendered width of `title` at the graph label size.
+///
+/// Latin characters count roughly half a CJK / full-width character. The
+/// result is clamped to `LABEL_MIN_WIDTH..LABEL_MAX_WIDTH`; an empty title
+/// returns `0.0` because it needs no horizontal clearance.
+pub fn estimate_label_width(title : String) -> Double {
+  if title.length() == 0 {
+    return 0.0
+  }
+  let mut width = 0.0
+  let mut i = 0
+  while i < title.length() {
+    let code = title.get_char(i).unwrap_or('\u{0}').to_int()
+    if code >= 0x2E80 {
+      width += LABEL_CJK_WIDTH
+    } else {
+      width += LABEL_LATIN_WIDTH
+    }
+    i += 1
+  }
+  if width < LABEL_MIN_WIDTH {
+    LABEL_MIN_WIDTH
+  } else if width > LABEL_MAX_WIDTH {
+    LABEL_MAX_WIDTH
+  } else {
+    width
+  }
+}
+
+///|
+/// Widest label allowance among `nodes`; `0.0` for an empty ring.
+fn max_label_width(nodes : Array[@graph.GraphNode]) -> Double {
+  let mut widest = 0.0
+  let mut i = 0
+  while i < nodes.length() {
+    let width = estimate_label_width(nodes[i].title)
+    if width > widest {
+      widest = width
+    }
+    i += 1
+  }
+  widest
+}
+
+///|
 /// Compute the radii used by every node on one orbit.
 ///
 /// `count` nodes are spread evenly, so the chord between neighbours is
@@ -367,13 +481,17 @@ fn ring_radii(
   preferred_radius : Double,
   max_radius : Double,
   node_radius : Double,
+  label_width : Double,
 ) -> Array[Double] {
   let radii : Array[Double] = []
   if count <= 0 {
     return radii
   }
   let cap = if max_radius > 0.0 { max_radius } else { 0.0 }
-  let center_clearance = CENTER_NODE_RADIUS + node_radius + NODE_GAP
+  let center_clearance = CENTER_NODE_RADIUS +
+    node_radius +
+    LABEL_HEIGHT +
+    LABEL_GAP
   let mut base = preferred_radius
   if base > cap {
     base = cap
@@ -385,7 +503,16 @@ fn ring_radii(
     radii.push(base)
     return radii
   }
-  let separation = node_radius * 2.0 + NODE_GAP
+  // Two neighbouring dots may be close as long as their labels do not collide.
+  // The chord between neighbours must therefore cover either the two circles
+  // plus the node gap, or the widest label plus its own safe gap.
+  let circle_separation = node_radius * 2.0 + NODE_GAP
+  let label_separation = label_width + LABEL_HORIZONTAL_GAP
+  let separation = if label_separation > circle_separation {
+    label_separation
+  } else {
+    circle_separation
+  }
   let required = separation / (2.0 * @math.sin(@math.PI / count.to_double()))
   if cap <= 0.0 {
     let mut i = 0

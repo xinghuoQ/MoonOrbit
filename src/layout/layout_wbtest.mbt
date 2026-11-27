@@ -173,7 +173,7 @@ test "isolated center node is placed exactly at the canvas center" {
   assert_eq(center.hop, 0)
   assert_eq(center.x, 300.0)
   assert_eq(center.y, 200.0)
-  assert_eq(center.radius, 22.0)
+  assert_eq(center.radius, 14.0)
   assert_false(has_node_overlap(layout))
 }
 
@@ -538,9 +538,141 @@ test "tags are preserved on positioned nodes" {
 ///|
 test "node radii follow the hop level" {
   let layout = compute_layout(make_layered_graph(4, 4), 600.0, 400.0)
-  assert_eq(find_node(layout, "center").radius, 22.0)
-  assert_eq(find_node(layout, "i00").radius, 16.0)
-  assert_eq(find_node(layout, "o00").radius, 13.0)
+  assert_eq(find_node(layout, "center").radius, 14.0)
+  assert_eq(find_node(layout, "i00").radius, 9.0)
+  assert_eq(find_node(layout, "o00").radius, 7.0)
+}
+
+// ---------------------------------------------------------------------------
+// Portrait canvases and label clearance
+// ---------------------------------------------------------------------------
+
+///|
+test "label width estimation distinguishes Latin and CJK text" {
+  assert_eq(estimate_label_width(""), 0.0)
+  assert_eq(estimate_label_width("ab"), 22.0)
+  assert_eq(estimate_label_width("中文"), 24.0)
+  assert_eq(estimate_label_width("abcdefghij"), 60.0)
+  assert_eq(estimate_label_width("这是一个非常非常长的标题"), 96.0)
+}
+
+///|
+/// A star graph whose notes carry readable titles instead of short ids.
+fn make_titled_star_graph(titles : Array[String]) -> @graph.LocalGraph {
+  let center_content = StringBuilder()
+  let mut i = 0
+  while i < titles.length() {
+    center_content.write_string("[[")
+    center_content.write_string(titles[i])
+    center_content.write_string("]] ")
+    i += 1
+  }
+  let notes : Array[@graph.Note] = [
+    @graph.Note::new("center", "中心笔记", center_content.to_string()),
+  ]
+  i = 0
+  while i < titles.length() {
+    notes.push(@graph.Note::new("n" + i.to_string(), titles[i], ""))
+    i += 1
+  }
+  make_store(notes).get_local_graph("center", 1)
+}
+
+///|
+/// Smallest pairwise distance between two nodes on the given hop.
+fn min_hop_distance(layout : GraphLayout, hop : Int) -> Double {
+  let points : Array[PositionedNode] = []
+  let mut i = 0
+  while i < layout.nodes.length() {
+    if layout.nodes[i].hop == hop {
+      points.push(layout.nodes[i])
+    }
+    i += 1
+  }
+  let mut smallest = 1000000000.0
+  let mut a = 0
+  while a < points.length() {
+    let mut b = a + 1
+    while b < points.length() {
+      let dx = points[a].x - points[b].x
+      let dy = points[a].y - points[b].y
+      let distance = (dx * dx + dy * dy).sqrt()
+      if distance < smallest {
+        smallest = distance
+      }
+      b += 1
+    }
+    a += 1
+  }
+  smallest
+}
+
+///|
+test "portrait canvas stretches hop orbits vertically" {
+  let layout = compute_layout(make_layered_graph(4, 4), 360.0, 720.0)
+  let center = find_node(layout, "center")
+  let mut max_dx = 0.0
+  let mut max_dy = 0.0
+  let mut i = 0
+  while i < layout.nodes.length() {
+    let node = layout.nodes[i]
+    if node.hop > 0 {
+      let dx = (node.x - center.x).abs()
+      let dy = (node.y - center.y).abs()
+      if dx > max_dx {
+        max_dx = dx
+      }
+      if dy > max_dy {
+        max_dy = dy
+      }
+    }
+    i += 1
+  }
+  assert_true(max_dy > max_dx)
+  assert_true(max_dy > 0.0)
+}
+
+///|
+test "portrait layout keeps every node inside the canvas" {
+  let layout = compute_layout(make_layered_graph(6, 8), 360.0, 720.0)
+  let mut i = 0
+  while i < layout.nodes.length() {
+    let node = layout.nodes[i]
+    assert_true(node.x - node.radius >= 0.0)
+    assert_true(node.y - node.radius >= 0.0)
+    assert_true(node.x + node.radius <= layout.width)
+    assert_true(node.y + node.radius <= layout.height)
+    i += 1
+  }
+  assert_false(has_node_overlap(layout))
+}
+
+///|
+test "long titles reserve enough chord between neighbours" {
+  let titles : Array[String] = [
+    "这是一个很长的标题",
+    "另一个同样很长的标题",
+    "第三个长标题文本",
+    "第四个长标题内容",
+    "第五个长标题名称",
+    "第六个长标题记录",
+  ]
+  let layout = compute_layout(make_titled_star_graph(titles), 420.0, 860.0)
+  let smallest = min_hop_distance(layout, 1)
+  assert_true(smallest > 0.0)
+  let widest = estimate_label_width("这是一个很长的标题")
+  assert_true(smallest + 0.001 >= widest)
+  assert_false(has_node_overlap(layout))
+}
+
+///|
+test "portrait two-ring layout still has no overlaps" {
+  let layout = compute_layout(make_layered_graph(8, 8), 400.0, 900.0)
+  assert_false(has_node_overlap(layout))
+  let center = find_node(layout, "center")
+  let inner_radius = distance_from(find_node(layout, "i00"), center.x, center.y)
+  let outer_radius = distance_from(find_node(layout, "o00"), center.x, center.y)
+  assert_true(outer_radius > inner_radius)
 }
 
 // ---------------------------------------------------------------------------

@@ -12,18 +12,38 @@ pub fn graph_status() -> String {
 /// A note stored in the vault.
 ///
 /// `id` is the stable identity used by every graph query, `title` is the
-/// human-readable name that `[[wikilinks]]` resolve against, and `content` is
-/// the raw Markdown source.
+/// human-readable name that `[[wikilinks]]` resolve against, `content` is the
+/// raw Markdown source, and `folder` is the workspace folder the note lives
+/// in. An empty `folder` means the vault root.
 pub struct Note {
   id : String
   title : String
   content : String
+  folder : String
 }
 
 ///|
-/// Convenience constructor for a note.
+/// Convenience constructor for a note at the vault root.
+///
+/// Kept for backward compatibility with every stage 1–6 caller: the folder
+/// defaults to the empty string, which represents the root of the workspace.
 pub fn Note::new(id : String, title : String, content : String) -> Note {
-  { id: id, title: title, content: content }
+  { id: id, title: title, content: content, folder: "" }
+}
+
+///|
+/// Constructor for a note inside `folder`.
+///
+/// Pass an empty string for `folder` to place the note at the vault root.
+/// Folder names are stored verbatim (for example `"01-快速开始"`); the graph
+/// engine never interprets them as nested paths.
+pub fn Note::with_folder(
+  id : String,
+  title : String,
+  content : String,
+  folder : String,
+) -> Note {
+  { id: id, title: title, content: content, folder: folder }
 }
 
 ///|
@@ -158,6 +178,70 @@ pub fn NoteStore::list_notes(self : NoteStore) -> Array[Note] {
     i += 1
   }
   result
+}
+
+///|
+/// Every distinct non-root folder name used by a note, sorted by code unit.
+///
+/// The vault root (`""`) is deliberately excluded: callers render it as a
+/// dedicated root row instead of a named folder.
+pub fn NoteStore::list_folders(self : NoteStore) -> Array[String] {
+  let folders : Array[String] = []
+  let mut i = 0
+  while i < self.notes.length() {
+    let folder = self.notes[i].folder
+    if folder != "" && !contains_string(folders, folder) {
+      folders.push(folder)
+    }
+    i += 1
+  }
+  sort_strings(folders)
+  folders
+}
+
+///|
+/// Notes stored directly inside `folder`, in store insertion order.
+///
+/// Pass `""` to list the notes at the vault root.
+pub fn NoteStore::notes_in_folder(
+  self : NoteStore,
+  folder : String,
+) -> Array[Note] {
+  let result : Array[Note] = []
+  let mut i = 0
+  while i < self.notes.length() {
+    let note = self.notes[i]
+    if note.folder == folder {
+      result.push(note)
+    }
+    i += 1
+  }
+  result
+}
+
+///|
+/// Move the note with `id` into `folder`.
+///
+/// Returns `false` when the id is unknown. The note's id, title and content
+/// are preserved, and the link/tag indexes stay valid because folders never
+/// participate in wikilink resolution.
+pub fn NoteStore::set_note_folder(
+  self : NoteStore,
+  id : String,
+  folder : String,
+) -> Bool {
+  let index = find_note_index(self.notes, id)
+  if index < 0 {
+    return false
+  }
+  let note = self.notes[index]
+  self.notes[index] = Note::with_folder(
+    note.id,
+    note.title,
+    note.content,
+    folder,
+  )
+  true
 }
 
 ///|

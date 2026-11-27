@@ -454,3 +454,107 @@ test "tag updates are reflected in the local graph" {
     "new",
   )
 }
+
+// ---------------------------------------------------------------------------
+// Folder metadata
+// ---------------------------------------------------------------------------
+
+///|
+test "Note::new defaults folder to the vault root" {
+  let note = Note::new("a", "Alpha", "body")
+  assert_eq(note.folder, "")
+}
+
+///|
+test "Note::with_folder stores the folder verbatim" {
+  let note = Note::with_folder("a", "Alpha", "body", "01-快速开始")
+  assert_eq(note.id, "a")
+  assert_eq(note.title, "Alpha")
+  assert_eq(note.content, "body")
+  assert_eq(note.folder, "01-快速开始")
+}
+
+///|
+test "upsert keeps folder metadata readable through get_note" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::with_folder("a", "Alpha", "body", "02-双链与标签"))
+  match store.get_note("a") {
+    Some(note) => assert_eq(note.folder, "02-双链与标签")
+    None => assert_true(false)
+  }
+  assert_eq(store.list_notes()[0].folder, "02-双链与标签")
+}
+
+///|
+test "upsert with the same id updates the folder" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::with_folder("a", "Alpha", "body", "old"))
+  store.upsert_note(Note::with_folder("a", "Alpha", "body", "new"))
+  assert_eq(store.list_notes().length(), 1)
+  assert_eq(store.list_notes()[0].folder, "new")
+}
+
+///|
+test "set_note_folder moves a note and preserves its content" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::with_folder("a", "Alpha", "[[B]]", "old"))
+  assert_true(store.set_note_folder("a", "new"))
+  match store.get_note("a") {
+    Some(note) => {
+      assert_eq(note.folder, "new")
+      assert_eq(note.title, "Alpha")
+      assert_eq(note.content, "[[B]]")
+    }
+    None => assert_true(false)
+  }
+  assert_false(store.set_note_folder("missing", "new"))
+}
+
+///|
+test "list_folders deduplicates, sorts and excludes the root" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::new("root", "Root", ""))
+  store.upsert_note(Note::with_folder("b", "Beta", "", "02-双链与标签"))
+  store.upsert_note(Note::with_folder("a", "Alpha", "", "01-快速开始"))
+  store.upsert_note(Note::with_folder("c", "Gamma", "", "02-双链与标签"))
+  assert_eq(
+    join_strings(store.list_folders(), ","),
+    "01-快速开始,02-双链与标签",
+  )
+}
+
+///|
+test "notes_in_folder filters root and named folders" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::new("root", "Root", ""))
+  store.upsert_note(Note::with_folder("a", "Alpha", "", "01-快速开始"))
+  store.upsert_note(Note::with_folder("b", "Beta", "", "02-双链与标签"))
+  store.upsert_note(Note::with_folder("c", "Gamma", "", "01-快速开始"))
+  assert_eq(note_ids_text(store.notes_in_folder("")), "root")
+  assert_eq(note_ids_text(store.notes_in_folder("01-快速开始")), "a,c")
+  assert_eq(store.notes_in_folder("missing").length(), 0)
+}
+
+///|
+test "removing the last note in a folder drops the folder" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::with_folder("a", "Alpha", "", "solo"))
+  assert_eq(join_strings(store.list_folders(), ","), "solo")
+  assert_true(store.remove_note("a"))
+  assert_eq(store.list_folders().length(), 0)
+}
+
+///|
+test "moving a note between folders leaves links untouched" {
+  let store = NoteStore::new()
+  store.upsert_note(Note::with_folder("b", "Beta", "", "old"))
+  store.upsert_note(Note::with_folder("a", "Alpha", "[[Beta]]", "old"))
+  assert_eq(note_ids_text(store.get_backlinks("b")), "a")
+  assert_true(store.set_note_folder("a", "new"))
+  match store.get_note("a") {
+    Some(note) => assert_eq(note.folder, "new")
+    None => assert_true(false)
+  }
+  assert_eq(note_ids_text(store.get_backlinks("b")), "a")
+  assert_eq(join_strings(store.get_outgoing_links("a"), ","), "b")
+}

@@ -57,14 +57,18 @@ fn render_result_to_json(result : @parser.ParseResult) -> Json {
 }
 
 ///|
-/// Convert a backlink note into the compact `{id, title}` form the front end
-/// needs for the backlink list.
+/// Convert a backlink note into the compact `{id, title, folder}` form the
+/// front end needs for the backlink list.
 fn note_summaries_to_json(notes : Array[@graph.Note]) -> Json {
   let items : Array[Json] = []
   let mut i = 0
   while i < notes.length() {
     let note = notes[i]
-    let item : Json = { "id": note.id, "title": note.title }
+    let item : Json = {
+      "id": note.id,
+      "title": note.title,
+      "folder": note.folder,
+    }
     items.push(item)
     i += 1
   }
@@ -72,9 +76,27 @@ fn note_summaries_to_json(notes : Array[@graph.Note]) -> Json {
 }
 
 ///|
+/// Folder of the created note with `id`, or `""` for ghost nodes and unknown
+/// ids.
+fn folder_of_note(notes : Array[@graph.Note], id : String) -> String {
+  let mut i = 0
+  while i < notes.length() {
+    if notes[i].id == id {
+      return notes[i].folder
+    }
+    i += 1
+  }
+  ""
+}
+
+///|
 /// Convert positioned layout nodes into JSON, keeping every field the SVG
-/// renderer needs.
-fn positioned_nodes_to_json(nodes : Array[@layout.PositionedNode]) -> Json {
+/// renderer needs. Every node also carries its workspace `folder`; ghost nodes
+/// and notes outside the request fall back to the vault root (`""`).
+fn positioned_nodes_to_json(
+  nodes : Array[@layout.PositionedNode],
+  notes : Array[@graph.Note],
+) -> Json {
   let items : Array[Json] = []
   let mut i = 0
   while i < nodes.length() {
@@ -85,6 +107,7 @@ fn positioned_nodes_to_json(nodes : Array[@layout.PositionedNode]) -> Json {
       "exists": node.exists,
       "hop": node.hop,
       "tags": strings_to_json(node.tags),
+      "folder": folder_of_note(notes, node.id),
       "x": node.x,
       "y": node.y,
       "radius": node.radius,
@@ -118,13 +141,17 @@ fn layout_edges_to_json(edges : Array[@layout.LayoutEdge]) -> Json {
 }
 
 ///|
-/// Convert the complete layout result into the `layout` object.
-fn layout_to_json(layout : @layout.GraphLayout) -> Json {
+/// Convert the complete layout result into the `layout` object, attaching the
+/// workspace folder to every node.
+fn layout_to_json(
+  layout : @layout.GraphLayout,
+  notes : Array[@graph.Note],
+) -> Json {
   {
     "center_id": layout.center_id,
     "width": layout.width,
     "height": layout.height,
-    "nodes": positioned_nodes_to_json(layout.nodes),
+    "nodes": positioned_nodes_to_json(layout.nodes, notes),
     "edges": layout_edges_to_json(layout.edges),
   }
 }
@@ -169,8 +196,136 @@ fn optional_number(
 }
 
 ///|
+/// Read an optional string field, falling back to `default_value` when the
+/// field is absent. A present but non-string value is reported as an error.
+fn optional_string(
+  obj : Map[String, Json],
+  key : String,
+  default_value : String,
+) -> Result[String, String] {
+  match obj.get(key) {
+    Some(String(value)) => Ok(value)
+    Some(_) => Err("field \"" + key + "\" must be a string")
+    None => Ok(default_value)
+  }
+}
+
+///|
+/// Decode the optional top-level `folders` array.
+///
+/// Empty names are ignored because the vault root is rendered as a dedicated
+/// row rather than a named folder. Duplicate names collapse into one entry so
+/// the response stays deterministic.
+fn decode_folders(value : Json?) -> Result[Array[String], String] {
+  match value {
+    None => Ok([])
+    Some(Array(items)) => {
+      let folders : Array[String] = []
+      let mut i = 0
+      while i < items.length() {
+        match items[i] {
+          String(name) => {
+            if name != "" && !contains_string(folders, name) {
+              folders.push(name)
+            }
+          }
+          _ =>
+            return Err(
+              "\"folders\"[" + i.to_string() + "] must be a string",
+            )
+        }
+        i += 1
+      }
+      Ok(folders)
+    }
+    Some(_) => Err("field \"folders\" must be an array")
+  }
+}
+
+///|
+fn contains_string(items : Array[String], value : String) -> Bool {
+  let mut i = 0
+  while i < items.length() {
+    if items[i] == value {
+      return true
+    }
+    i += 1
+  }
+  false
+}
+
+///|
+/// Compare two strings by code unit, returning -1, 0 or 1.
+fn compare_string(a : String, b : String) -> Int {
+  let length_a = a.length()
+  let length_b = b.length()
+  let mut i = 0
+  while i < length_a && i < length_b {
+    let ca = a.get_char(i).unwrap_or('\u{0}').to_int()
+    let cb = b.get_char(i).unwrap_or('\u{0}').to_int()
+    if ca < cb {
+      return -1
+    }
+    if ca > cb {
+      return 1
+    }
+    i += 1
+  }
+  if length_a < length_b {
+    -1
+  } else if length_a > length_b {
+    1
+  } else {
+    0
+  }
+}
+
+///|
+fn sort_strings(items : Array[String]) -> Unit {
+  let mut i = 1
+  while i < items.length() {
+    let key = items[i]
+    let mut j = i - 1
+    while j >= 0 && compare_string(items[j], key) > 0 {
+      items[j + 1] = items[j]
+      j -= 1
+    }
+    items[j + 1] = key
+    i += 1
+  }
+}
+
+///|
+/// Merge the folders observed in `notes` with folders supplied by the caller
+/// (which may include empty folders) into one sorted, deduplicated list.
+fn merged_folders(
+  notes : Array[@graph.Note],
+  extra : Array[String],
+) -> Array[String] {
+  let folders : Array[String] = []
+  let mut i = 0
+  while i < notes.length() {
+    let folder = notes[i].folder
+    if folder != "" && !contains_string(folders, folder) {
+      folders.push(folder)
+    }
+    i += 1
+  }
+  let mut j = 0
+  while j < extra.length() {
+    if extra[j] != "" && !contains_string(folders, extra[j]) {
+      folders.push(extra[j])
+    }
+    j += 1
+  }
+  sort_strings(folders)
+  folders
+}
+
+///|
 /// Decode the `notes` array into graph notes. Every note must be an object
-/// with string `id`, `title` and `content` fields.
+/// with string `id`, `title` and `content` fields. `folder` is optional and
+/// defaults to the vault root (`""`).
 fn decode_notes(items : Array[Json]) -> Result[Array[@graph.Note], String] {
   let notes : Array[@graph.Note] = []
   let mut i = 0
@@ -192,7 +347,11 @@ fn decode_notes(items : Array[Json]) -> Result[Array[@graph.Note], String] {
       Ok(value) => value
       Err(message) => return Err(path + " " + message)
     }
-    notes.push(@graph.Note::new(id, title, content))
+    let folder = match optional_string(note_obj, "folder", "") {
+      Ok(value) => value
+      Err(message) => return Err(path + " " + message)
+    }
+    notes.push(@graph.Note::with_folder(id, title, content, folder))
     i += 1
   }
   Ok(notes)
@@ -234,6 +393,15 @@ fn compute_workspace(request_json : String) -> Result[Json, String] {
     Ok(value) => value
     Err(message) => return Err(message)
   }
+  // `folders` is optional. When present it may list empty folders that have no
+  // notes yet; the response then echoes the merged folder tree. Omitting the
+  // field keeps the stage 1–6 six-key response envelope unchanged.
+  let folders_value = request.get("folders")
+  let include_folders = folders_value is Some(_)
+  let extra_folders = match decode_folders(folders_value) {
+    Ok(value) => value
+    Err(message) => return Err(message)
+  }
 
   // Build a fresh, stateless store for this request.
   let store = @graph.NoteStore::new()
@@ -253,14 +421,28 @@ fn compute_workspace(request_json : String) -> Result[Json, String] {
   let layout = @layout.compute_layout(local_graph, width, height)
   let backlinks = store.get_backlinks(active_id)
   let unresolved = store.get_unresolved_links()
-  Ok({
-    "ok": true,
-    "error": @json.null,
-    "active_render": render_result_to_json(parsed),
-    "backlinks": note_summaries_to_json(backlinks),
-    "unresolved_links": strings_to_json(unresolved),
-    "layout": layout_to_json(layout),
-  })
+  let layout_json = layout_to_json(layout, notes)
+  if include_folders {
+    let folder_names = merged_folders(notes, extra_folders)
+    Ok({
+      "ok": true,
+      "error": @json.null,
+      "active_render": render_result_to_json(parsed),
+      "backlinks": note_summaries_to_json(backlinks),
+      "unresolved_links": strings_to_json(unresolved),
+      "layout": layout_json,
+      "folders": strings_to_json(folder_names),
+    })
+  } else {
+    Ok({
+      "ok": true,
+      "error": @json.null,
+      "active_render": render_result_to_json(parsed),
+      "backlinks": note_summaries_to_json(backlinks),
+      "unresolved_links": strings_to_json(unresolved),
+      "layout": layout_json,
+    })
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -412,31 +594,37 @@ fn sample_notes_json() -> Json {
       "id": "guide",
       "title": "使用指南",
       "content": sample_guide_content(),
+      "folder": "01-快速开始",
     },
     {
       "id": "markdown-syntax",
       "title": "Markdown 语法",
       "content": sample_markdown_content(),
+      "folder": "01-快速开始",
     },
     {
       "id": "wikilinks",
       "title": "双链笔记",
       "content": sample_wikilinks_content(),
+      "folder": "02-双链与标签",
     },
     {
       "id": "tags",
       "title": "标签系统",
       "content": sample_tags_content(),
+      "folder": "02-双链与标签",
     },
     {
       "id": "local-graph",
       "title": "局部图谱",
       "content": sample_graph_content(),
+      "folder": "03-技术架构",
     },
     {
       "id": "moonbit",
       "title": "MoonBit 语言特性",
       "content": sample_moonbit_content(),
+      "folder": "03-技术架构",
     },
   ]
   Json::array(notes)
@@ -444,12 +632,14 @@ fn sample_notes_json() -> Json {
 
 ///|
 /// Return six interlinked sample notes as a JSON array
-/// `[{"id":"...","title":"...","content":"..."}, ...]`.
+/// `[{"id":"...","title":"...","content":"...","folder":"..."}, ...]`.
 ///
-/// The vault is built for the first page load: `使用指南` is linked from three
-/// notes, `双链笔记` bridges the second hop, aliases appear in several notes and
-/// `[[路线图规划]]` is deliberately never created so unresolved links and a
-/// ghost graph node are visible immediately.
+/// The vault is built for the first page load across three folders:
+/// `01-快速开始` (使用指南, Markdown 语法), `02-双链与标签` (双链笔记, 标签系统)
+/// and `03-技术架构` (局部图谱, MoonBit 语言特性). `使用指南` is linked from
+/// three notes, `双链笔记` bridges the second hop, aliases appear in several
+/// notes and `[[路线图规划]]` is deliberately never created so unresolved links
+/// and a ghost graph node are visible immediately.
 #export_name("get_sample_notes_json")
 pub fn get_sample_notes_json() -> String {
   sample_notes_json().stringify()

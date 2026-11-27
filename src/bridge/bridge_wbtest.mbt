@@ -382,7 +382,7 @@ test "compute_workspace_json centers the active node at default canvas" {
   assert_eq(as_int(field(center, "hop")), 0)
   assert_true(as_number(field(center, "x")) == 300.0)
   assert_true(as_number(field(center, "y")) == 200.0)
-  assert_true(as_number(field(center, "radius")) == 22.0)
+  assert_true(as_number(field(center, "radius")) == 14.0)
 }
 
 ///|
@@ -543,4 +543,114 @@ test "compute_workspace_json rejects a non-numeric width" {
 test "compute_workspace_json rejects a non-numeric height" {
   let message = expect_failure(sample_workspace_request(",\"height\":null"))
   assert_true(message.contains("height"))
+}
+
+// ---------------------------------------------------------------------------
+// Folder metadata round-trips
+// ---------------------------------------------------------------------------
+
+///|
+test "sample notes are distributed across three folders" {
+  let notes = as_array(parse_json(get_sample_notes_json()))
+  let folders = StringBuilder()
+  let mut i = 0
+  while i < notes.length() {
+    let note = as_object(notes[i])
+    let folder = as_string(field(note, "folder"))
+    assert_true(folder.length() > 0)
+    folders.write_string(as_string(field(note, "id")))
+    folders.write_string("=")
+    folders.write_string(folder)
+    folders.write_string(";")
+    i += 1
+  }
+  let text = folders.to_string()
+  assert_true(text.contains("guide=01-快速开始"))
+  assert_true(text.contains("markdown-syntax=01-快速开始"))
+  assert_true(text.contains("wikilinks=02-双链与标签"))
+  assert_true(text.contains("tags=02-双链与标签"))
+  assert_true(text.contains("local-graph=03-技术架构"))
+  assert_true(text.contains("moonbit=03-技术架构"))
+}
+
+///|
+test "compute_workspace_json attaches note folders to layout nodes" {
+  let response = as_object(
+    parse_json(compute_workspace_json(sample_workspace_request(",\"depth\":1"))),
+  )
+  let nodes = as_array(field(as_object(field(response, "layout")), "nodes"))
+  let center = find_node(nodes, "guide")
+  assert_eq(as_string(field(center, "folder")), "01-快速开始")
+  let neighbor = find_node(nodes, "wikilinks")
+  assert_eq(as_string(field(neighbor, "folder")), "02-双链与标签")
+  let ghost = find_node(nodes, "ghost:路线图规划")
+  assert_eq(as_string(field(ghost, "folder")), "")
+}
+
+///|
+test "compute_workspace_json defaults a missing folder to the root" {
+  let request = "{\"notes\":[{\"id\":\"solo\",\"title\":\"Solo\",\"content\":\"# Solo\"}],\"active_id\":\"solo\"}"
+  let response = as_object(parse_json(compute_workspace_json(request)))
+  let nodes = as_array(field(as_object(field(response, "layout")), "nodes"))
+  let center = find_node(nodes, "solo")
+  assert_eq(as_string(field(center, "folder")), "")
+}
+
+///|
+test "compute_workspace_json backlinks carry their folder" {
+  let response = as_object(
+    parse_json(compute_workspace_json(sample_workspace_request(",\"depth\":2"))),
+  )
+  let backlinks = as_array(field(response, "backlinks"))
+  let first = as_object(backlinks[0])
+  assert_eq(as_string(field(first, "id")), "wikilinks")
+  assert_eq(as_string(field(first, "folder")), "02-双链与标签")
+}
+
+///|
+test "compute_workspace_json merges explicitly listed empty folders" {
+  let request = "{\"notes\":[{\"id\":\"a\",\"title\":\"A\",\"content\":\"\",\"folder\":\"01-快速开始\"}],\"active_id\":\"a\",\"folders\":[\"空文件夹\",\"01-快速开始\",\"空文件夹\"]}"
+  let response = as_object(parse_json(compute_workspace_json(request)))
+  assert_eq(response.length(), 7)
+  let folders = as_array(field(response, "folders"))
+  assert_eq(folders.length(), 2)
+  assert_eq(as_string(folders[0]), "01-快速开始")
+  assert_eq(as_string(folders[1]), "空文件夹")
+}
+
+///|
+test "compute_workspace_json accepts an empty folders array" {
+  let request = "{\"notes\":[{\"id\":\"a\",\"title\":\"A\",\"content\":\"\",\"folder\":\"核心语法\"}],\"active_id\":\"a\",\"folders\":[]}"
+  let response = as_object(parse_json(compute_workspace_json(request)))
+  assert_eq(response.length(), 7)
+  let folders = as_array(field(response, "folders"))
+  assert_eq(folders.length(), 1)
+  assert_eq(as_string(folders[0]), "核心语法")
+}
+
+///|
+test "compute_workspace_json rejects a non-array folders field" {
+  let message = expect_failure(
+    "{\"notes\":[],\"active_id\":\"a\",\"folders\":\"oops\"}",
+  )
+  assert_true(message.contains("folders"))
+  assert_true(message.contains("array"))
+}
+
+///|
+test "compute_workspace_json rejects a non-string note folder" {
+  let message = expect_failure(
+    "{\"notes\":[{\"id\":\"a\",\"title\":\"A\",\"content\":\"\",\"folder\":7}],\"active_id\":\"a\"}",
+  )
+  assert_true(message.contains("folder"))
+  assert_true(message.contains("must be a string"))
+}
+
+///|
+test "compute_workspace_json rejects a non-string folders entry" {
+  let message = expect_failure(
+    "{\"notes\":[],\"active_id\":\"a\",\"folders\":[42]}",
+  )
+  assert_true(message.contains("folders"))
+  assert_true(message.contains("must be a string"))
 }

@@ -2,11 +2,23 @@
 package "moon_orbit/src/parser"
 
 // Values
+pub fn parse_markdown(String) -> ParseResult
+
 pub fn parser_status() -> String
 
 // Errors
 
 // Types and methods
+pub struct ParseResult {
+  html : String
+  links : Array[WikiLink]
+  tags : Array[String]
+}
+
+pub struct WikiLink {
+  target : String
+  alias_text : String?
+}
 
 // Type aliases
 

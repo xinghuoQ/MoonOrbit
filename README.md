@@ -4,7 +4,7 @@
 
 **A dual-link Markdown editor and local graph engine powered by MoonBit 1.0.**
 
-`MoonBit 1.0` · `171 unit tests` · `MIT License` · `Zero npm dependencies`
+`MoonBit 1.0` · `192 unit tests` · `MIT License` · `Zero npm dependencies`
 
 ---
 
@@ -14,9 +14,10 @@
 
 MoonOrbit（月轨）把 **MarkText 的清爽实时排版** 与 **Obsidian 的局部关系图谱** 放进同一个三栏界面：
 
-- **左栏**：文件夹 + `.md` 文档资源管理器（可折叠文件夹、文档标签徽章、新建/重命名/删除文件夹、导入与导出 `.md`）、关键词搜索、未创建链接（幽灵节点）。
+- **左栏**：文件夹 + `.md` 文档资源管理器（可折叠文件夹、文档标签徽章、新建/重命名/删除文件夹、导入与导出 `.md`）、关键词搜索、标签筛选胶囊栏（点击标签调用 MoonBit `query_notes_json` 筛选）、未创建链接（幽灵节点）。
 - **中栏**：MarkText 风格的 Markdown 编辑与实时预览，顶部可切换当前文档所属文件夹；点击 `[[双链]]` 即可跳转或一键创建目标笔记，底部展示反向链接。
 - **右栏**：Obsidian 风格的 SVG 局部图谱，支持 1 跳 / 2 跳、方向箭头、轨道参考圈、悬停聚焦淡化、滚轮缩放（0.5x–2.5x）、拖拽空白平移、单节点自由拖拽，右上角提供 + / − / 重置居中按钮。
+- **快捷键**：`Ctrl/Cmd + S` 导出当前 `.md`，`Ctrl/Cmd + N` 新建文档。
 
 项目采用 **“重 MoonBit 核心引擎 + 轻 Web 界面”** 架构：Markdown 解析、双链与标签提取、反向链接、未创建节点、局部子图、2D 布局坐标全部由 MoonBit 完成并编译为 JavaScript；前端只负责 DOM/SVG 渲染与交互，零 npm、零打包器、零运行时框架。
 
@@ -24,9 +25,10 @@ MoonOrbit（月轨）把 **MarkText 的清爽实时排版** 与 **Obsidian 的�
 
 MoonOrbit combines **MarkText-style live Markdown typesetting** with an **Obsidian-style local graph** in a three-pane workspace:
 
-- **Left**: a folder + `.md` document explorer (collapsible folders, per-note tag badges, new/rename/delete folder, `.md` import and export), keyword search and unresolved (“ghost”) links.
+- **Left**: a folder + `.md` document explorer (collapsible folders, per-note tag badges, new/rename/delete folder, `.md` import and export), keyword search, a tag-filter capsule bar backed by MoonBit `query_notes_json`, and unresolved (“ghost”) links.
 - **Center**: MarkText-inspired editing with live preview and a folder dropdown for the active document. Clicking a `[[wikilink]]` opens the target note or creates it on the spot; backlinks sit below the editor.
 - **Right**: an Obsidian-inspired SVG local graph with 1-hop / 2-hop depth, directed arrowheads, orbit guide rings, hover focus with dimming, wheel zoom (0.5x–2.5x), drag-to-pan, free node dragging and + / − / reset controls.
+- **Shortcuts**: `Ctrl/Cmd + S` exports the active `.md`; `Ctrl/Cmd + N` creates a new document.
 
 The architecture is **heavy MoonBit core + light web shell**: Markdown rendering, wikilink and tag extraction, backlinks, unresolved links, local subgraph traversal and every `(x, y)` layout coordinate are produced by MoonBit compiled to JavaScript. The browser layer only renders DOM/SVG and handles interaction — no npm, no bundler, no frontend framework.
 
@@ -41,10 +43,12 @@ The architecture is **heavy MoonBit core + light web shell**: Markdown rendering
 | Markdown 渲染 | H1–H6、粗体、斜体、行内代码、代码块、列表、引用、普通链接 |
 | 双链 | `[[目标笔记]]`、`[[目标笔记\|显示别名]]`，预览中可直接点击 |
 | 标签 | `#moonbit`、`#工作/计划`，显示在笔记列表与图谱节点数据中 |
+| 标签筛选 | 左栏胶囊栏列出全库标签，点击调用 MoonBit `query_notes_json` 筛选文档 |
 | 反向链接 | 谁引用了当前笔记，实时计算并展示为中栏底部胶囊 |
 | 未创建链接 | 被引用但尚未创建的标题，左侧一键创建 |
 | 文件夹树 | `📁 文件夹` 可折叠，文档显示为 `📄 标题.md` 并带标签数量徽章 |
 | 文档工作流 | 编辑器顶部切换所属文件夹；支持多选导入本地 `.md` 与导出当前文档 |
+| 快捷键 | `Ctrl/Cmd+S` 导出当前 `.md`，`Ctrl/Cmd+N` 新建文档 |
 | 局部图谱 | 以当前笔记为中心的 1 跳 / 2 跳子图，出链与入链都参与遍历 |
 | 图谱交互 | 悬停聚焦（无关节点淡至 0.25）、滚轮缩放、拖拽平移、单节点自由拖拽 |
 | 确定性布局 | 中心固定、内圈 1 跳、外圈 2 跳；节点 14/9/7 圆点，标题在圆点下方并预留防遮挡间距 |
@@ -58,10 +62,12 @@ The architecture is **heavy MoonBit core + light web shell**: Markdown rendering
 | Markdown | Headings H1–H6, bold, italic, inline code, fenced code, lists, quotes, links |
 | Wikilinks | `[[Target]]` and `[[Target\|alias]]`, clickable in the preview |
 | Tags | `#moonbit`, `#work/plan`, surfaced in the vault list and graph data |
+| Tag filter | A capsule bar lists every vault tag; clicking calls MoonBit `query_notes_json` to filter documents |
 | Backlinks | Every note that references the active note, computed live |
 | Unresolved links | Referenced-but-missing titles, creatable in one click |
 | Folder tree | Collapsible `📁 folders`, `📄 title.md` documents and per-note tag badges |
 | Markdown workflow | Folder dropdown in the editor, multi-file `.md` import and current-note export |
+| Shortcuts | `Ctrl/Cmd+S` exports the active `.md`; `Ctrl/Cmd+N` creates a document |
 | Local graph | 1-hop / 2-hop subgraph around the active note; outgoing and incoming edges both traverse |
 | Graph interaction | Hover focus (unrelated nodes dim to 0.25), wheel zoom, drag-to-pan and free node dragging |
 | Deterministic layout | Center pinned, hop-1 inner ring, hop-2 outer ring; 14/9/7 dots with labels below and reserved clearance |
@@ -159,13 +165,14 @@ The center node is pinned to the canvas center with `14 / 9 / 7` dot radii for h
 
 **中文**
 
-对外暴露四个函数，其中三个是网页使用的稳定 API：
+对外暴露五个函数，其中四个是网页使用的稳定 API：
 
 | 函数 | 作用 |
 | --- | --- |
 | `get_sample_notes_json()` | 返回 6 篇互链示例笔记，其中「路线图规划」故意未创建 |
 | `render_markdown_json(markdown)` | 返回 `{html, links, tags}` |
 | `compute_workspace_json(request)` | 返回渲染结果、反链、未创建链接与带坐标的布局 |
+| `query_notes_json(request)` | 按关键词 / 标签筛选笔记，返回匹配 id 与全库标签 |
 | `bridge_status()` | 阶段 1 保留的冒烟测试入口 |
 
 请求 / Response contract:
@@ -201,11 +208,28 @@ The center node is pinned to the canvas center with `14 / 9 / 7` dot radii for h
 
 `folders` 是可选字段：请求不携带时响应保持旧的 6 键信封；携带（包括空数组）时响应追加合并后的文件夹列表，空文件夹也会保留。
 
+标签筛选请求 / query request:
+
+```json
+{ "notes": ["…same note array…"], "query": "moon", "tag": "#图谱" }
+```
+
+```json
+{
+  "ok": true,
+  "error": null,
+  "matches": ["local-graph"],
+  "tags": ["markdown", "moonbit", "moonorbit", "分类", "双链", "可视化", "图谱", "工作/计划", "指南", "标签", "知识管理", "语法", "语言"]
+}
+```
+
+`query` 与 `tag` 都是可选字段并用 AND 组合；`query` 对标题、正文、文件夹做不区分大小写的匹配，`tag` 接受 `work` 或 `#work` 两种写法。`matches` 保持笔记库插入顺序，`tags` 返回全库去重排序后的标签。
+
 任何非法输入都返回 `{"ok": false, "error": "…"}`，不会有异常逃逸到 JavaScript。
 
 **English**
 
-Three stable web APIs plus one legacy smoke-test entry. Each note may carry an optional `folder` (default `""`), layout nodes and backlinks echo it, and an optional request-level `folders` array preserves empty folders. Malformed input always returns `{"ok": false, "error": "…"}`; no exception escapes into JavaScript.
+Four stable web APIs plus one legacy smoke-test entry. Each note may carry an optional `folder` (default `""`), layout nodes and backlinks echo it, and an optional request-level `folders` array preserves empty folders. `query_notes_json` filters by keyword and/or tag and returns matching ids plus every vault tag. Malformed input always returns `{"ok": false, "error": "…"}`; no exception escapes into JavaScript.
 
 ### `web/` — the shell
 
@@ -228,24 +252,24 @@ Three stable web APIs plus one legacy smoke-test entry. Each note may carry an o
 
 **中文**
 
-当前 **171 个单元测试全部通过**，覆盖四个包：
+当前 **192 个单元测试全部通过**，覆盖四个包：
 
 - `src/parser`：块级与行内 Markdown、转义、别名双链、标签边界、CRLF。
-- `src/graph`：笔记增删改、反链、幽灵节点、深度截断、BFS 跳数、排序稳定性、`folder` 存储/更新/移动。
+- `src/graph`：笔记增删改、反链、幽灵节点、深度截断、BFS 跳数、排序稳定性、`folder` 存储/更新/移动、全文搜索与标签筛选。
 - `src/layout`：中心固定、14/9/7 半径、内外圈半径、节点不重叠、标签宽度估算、竖屏拉伸、异常画布回退、确定性。
-- `src/bridge`：JSON 往返、`folder`/`folders` 往返、错误信封、示例库完整性。
+- `src/bridge`：JSON 往返、`folder`/`folders` 往返、`query_notes_json` 关键词/标签/交集查询、错误信封、示例库完整性。
 
 ```bash
 $ moon check --deny-warn
 Finished. moon: no work to do
 
 $ moon test
-Total tests: 171, passed: 171, failed: 0.
+Total tests: 192, passed: 192, failed: 0.
 ```
 
 **English**
 
-All **171 unit tests pass**, covering the parser (blocks, inline syntax, escaping, aliases, tag boundaries, CRLF), the graph store (mutation, backlinks, ghost ids, depth clamping, BFS hops, deterministic sorting, folder storage/moves), layout (center pinning, 14/9/7 radii, ring radii, non-overlap, label-width clearance, portrait stretching, invalid-canvas fallback, determinism) and the JSON bridge (folder round-trips, error envelope, sample vault).
+All **192 unit tests pass**, covering the parser (blocks, inline syntax, escaping, aliases, tag boundaries, CRLF), the graph store (mutation, backlinks, ghost ids, depth clamping, BFS hops, deterministic sorting, folder storage/moves, full-text search and tag filters), layout (center pinning, 14/9/7 radii, ring radii, non-overlap, label-width clearance, portrait stretching, invalid-canvas fallback, determinism) and the JSON bridge (folder round-trips, keyword/tag/intersection queries, error envelope, sample vault).
 
 ---
 
@@ -363,7 +387,8 @@ MoonOrbit/
 ## 路线图 · Roadmap
 
 - [ ] 表格、任务列表、脚注等扩展 Markdown 语法 / tables, task lists, footnotes
-- [ ] 全文搜索高亮与标签筛选 / search highlighting and tag filters
+- [x] 标签筛选胶囊栏 / tag-filter capsules
+- [ ] 全文搜索高亮 / search-term highlighting
 - [x] 文件夹树与 `.md` 导入导出 / folder tree and `.md` import/export
 - [x] 图谱节点自由拖拽 / free node dragging
 - [ ] 节点固定与整库图谱 / pinning and whole-vault graph

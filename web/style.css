@@ -250,6 +250,88 @@ ul {
   font-weight: 600;
 }
 
+/* Tag filter --------------------------------------------------------------- */
+
+.tag-filter {
+  padding: 10px 16px 0;
+}
+
+.tag-filter-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0.09em;
+}
+
+.tag-filter-state {
+  max-width: 128px;
+  margin-left: auto;
+  padding: 1px 7px;
+  overflow: hidden;
+  color: #4768b3;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-line);
+  border-radius: var(--radius-pill);
+}
+
+.tag-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  max-height: 76px;
+  margin-top: 6px;
+  padding-bottom: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.tag-chip {
+  max-width: 100%;
+  padding: 2px 9px;
+  overflow: hidden;
+  color: #6f6656;
+  font-size: 10.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  background: #f4efe5;
+  border: 1px solid #e9e2d5;
+  border-radius: var(--radius-pill);
+  transition: color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    border-color var(--duration-fast) ease,
+    box-shadow var(--duration-fast) ease, transform var(--duration-fast) ease;
+}
+
+.tag-chip:hover {
+  color: var(--accent-deep);
+  background: #fff;
+  border-color: var(--accent-line);
+  transform: translateY(-1px);
+}
+
+.tag-chip.is-active {
+  color: #fff;
+  background: linear-gradient(180deg, #4a7dff 0%, #2f63e8 100%);
+  border-color: #2f63e8;
+  box-shadow: 0 4px 10px -6px rgba(47, 99, 232, 0.8);
+}
+
+.tag-empty {
+  padding: 2px 0;
+  color: var(--faint);
+  font-size: 11px;
+  font-style: italic;
+}
+
 .btn {
   display: inline-flex;
   align-items: center;

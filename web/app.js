@@ -11,6 +11,7 @@
 import {
   compute_workspace_json,
   get_sample_notes_json,
+  query_notes_json,
   render_markdown_json,
 } from './bridge.js';
 import { renderExplorer } from './explorer.js';
@@ -35,6 +36,9 @@ const state = {
   workspace: null,
   graphSignature: null,
   tagCache: new Map(),
+  allTags: [],
+  activeTag: '',
+  tagMatches: null,
   selectedFolder: DEFAULT_FOLDER,
   expandedFolders: new Set(),
 };
@@ -50,6 +54,8 @@ const els = {
   exportBtn: $('#export-btn'),
   resetSampleBtn: $('#reset-sample-btn'),
   noteCount: $('#note-count'),
+  tagBar: $('#tag-bar'),
+  tagFilterState: $('#tag-filter-state'),
   folderTree: $('#folder-tree'),
   unresolvedCount: $('#unresolved-count'),
   unresolvedList: $('#unresolved-list'),
@@ -159,6 +165,15 @@ function currentFolder() {
   return folderExists(state.selectedFolder)
     ? state.selectedFolder
     : DEFAULT_FOLDER;
+}
+
+function notesPayload() {
+  return state.notes.map(({ id, title, content, folder }) => ({
+    id,
+    title,
+    content,
+    folder,
+  }));
 }
 
 // ---------------------------------------------------------------------------
@@ -391,6 +406,10 @@ function selectNote(id) {
 
 function createNote(title, options = {}) {
   const { exact = false, content, select = true, folder } = options;
+  // A brand-new document should always be visible, even when a tag filter was
+  // hiding parts of the vault a moment ago.
+  state.activeTag = '';
+  state.tagMatches = null;
   const targetFolder =
     folder === undefined ? currentFolder() : normalizeFolder(folder);
   const finalTitle = exact
@@ -610,6 +629,8 @@ async function importMarkdownFiles(fileList) {
 
   const folder = currentFolder();
   const imported = [];
+  state.activeTag = '';
+  state.tagMatches = null;
   for (const file of files) {
     try {
       const text = await file.text();
@@ -639,6 +660,13 @@ async function importMarkdownFiles(fileList) {
   updateFolderSelect();
   computeAndRender();
   toast(`已导入 ${imported.length} 篇 .md 文档`);
+}
+
+function newDocument() {
+  const note = createNote(DEFAULT_NOTE_TITLE, { select: true });
+  els.titleInput.focus();
+  els.titleInput.select();
+  toast(`已新建「${note.title}.md」`);
 }
 
 function exportActiveNote() {
@@ -690,9 +718,91 @@ function clearEngineError() {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Tag filter (MoonBit query_notes_json)
+// ---------------------------------------------------------------------------
+
+function renderTagBar() {
+  const fragment = document.createDocumentFragment();
+
+  const allChip = document.createElement('button');
+  allChip.type = 'button';
+  allChip.className = `tag-chip${state.activeTag ? '' : ' is-active'}`;
+  allChip.textContent = '全部';
+  allChip.title = '显示全部文档';
+  allChip.setAttribute('aria-pressed', String(!state.activeTag));
+  allChip.addEventListener('click', () => setActiveTag(''));
+  fragment.appendChild(allChip);
+
+  for (const tag of state.allTags) {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    const isActive = state.activeTag === tag;
+    chip.className = `tag-chip${isActive ? ' is-active' : ''}`;
+    chip.textContent = `#${tag}`;
+    chip.title = `按标签 #${tag} 筛选（再次点击取消）`;
+    chip.setAttribute('aria-pressed', String(isActive));
+    chip.addEventListener('click', () => setActiveTag(tag));
+    fragment.appendChild(chip);
+  }
+
+  if (state.allTags.length === 0) {
+    const empty = document.createElement('span');
+    empty.className = 'tag-empty';
+    empty.textContent = '暂无标签';
+    fragment.appendChild(empty);
+  }
+
+  els.tagBar.replaceChildren(fragment);
+  els.tagFilterState.textContent = state.activeTag
+    ? `#${state.activeTag}`
+    : '全部';
+}
+
+function refreshQueryState() {
+  let data;
+  try {
+    data = JSON.parse(
+      query_notes_json(
+        JSON.stringify({
+          notes: notesPayload(),
+          query: '',
+          tag: state.activeTag,
+        }),
+      ),
+    );
+  } catch (error) {
+    console.warn('MoonBit 标签查询失败。', error);
+    return;
+  }
+  if (!data || data.ok !== true) {
+    console.warn(
+      'MoonBit 标签查询返回错误。',
+      data && data.error ? data.error : '未知错误',
+    );
+    return;
+  }
+  state.allTags = Array.isArray(data.tags) ? data.tags : [];
+  state.tagMatches = state.activeTag
+    ? new Set(Array.isArray(data.matches) ? data.matches : [])
+    : null;
+  renderTagBar();
+}
+
+function setActiveTag(tag) {
+  state.activeTag = tag === state.activeTag ? '' : tag;
+  // Every chip click re-asks the MoonBit engine for the matching note ids.
+  refreshQueryState();
+  renderTree();
+}
+
 function renderTree() {
+  const visibleNotes = state.tagMatches
+    ? state.notes.filter((note) => state.tagMatches.has(note.id))
+    : state.notes;
+
   renderExplorer(els.folderTree, {
-    notes: state.notes,
+    notes: visibleNotes,
     folders: allFolders(),
     activeId: state.activeId,
     selectedFolder: state.selectedFolder,
@@ -708,9 +818,14 @@ function renderTree() {
       onDeleteFolder: deleteFolder,
     },
   });
-  els.noteCount.textContent = state.search
-    ? `${state.notes.length} 篇 · 搜索中`
-    : String(state.notes.length);
+
+  if (state.activeTag) {
+    els.noteCount.textContent = `${visibleNotes.length} / ${state.notes.length}`;
+  } else if (state.search) {
+    els.noteCount.textContent = `${state.notes.length} 篇 · 搜索中`;
+  } else {
+    els.noteCount.textContent = String(state.notes.length);
+  }
 }
 
 function computeAndRender() {
@@ -719,12 +834,7 @@ function computeAndRender() {
 
   const size = graphCanvasSize();
   const request = {
-    notes: state.notes.map(({ id, title, content, folder }) => ({
-      id,
-      title,
-      content,
-      folder,
-    })),
+    notes: notesPayload(),
     folders: allFolders(),
     active_id: note.id,
     depth: state.depth,
@@ -755,6 +865,7 @@ function computeAndRender() {
   state.workspace = data;
   state.graphSignature = signature;
   state.tagCache.set(note.id, data.active_render.tags || []);
+  refreshQueryState();
 
   renderTree();
   renderPreview(data.active_render.html);
@@ -951,12 +1062,7 @@ function bindEvents() {
     renderTree();
   });
 
-  els.newNoteBtn.addEventListener('click', () => {
-    const note = createNote(DEFAULT_NOTE_TITLE, { select: true });
-    els.titleInput.focus();
-    els.titleInput.select();
-    toast(`已新建「${note.title}.md」`);
-  });
+  els.newNoteBtn.addEventListener('click', newDocument);
 
   els.newFolderBtn.addEventListener('click', createFolder);
   els.importBtn.addEventListener('click', () => els.importInput.click());
@@ -984,6 +1090,8 @@ function bindEvents() {
     state.search = '';
     state.editorNoteId = null;
     state.graphSignature = null;
+    state.activeTag = '';
+    state.tagMatches = null;
     state.selectedFolder = SAMPLE_EXPANDED_FOLDER;
     state.expandedFolders = new Set(state.folders);
     els.searchInput.value = '';
@@ -1087,6 +1195,21 @@ function bindEvents() {
   els.graphReset.addEventListener('click', () => graphView.reset());
 }
 
+function bindGlobalShortcuts() {
+  document.addEventListener('keydown', (event) => {
+    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
+    if (event.defaultPrevented) return;
+    const key = event.key.toLowerCase();
+    if (key === 's') {
+      event.preventDefault();
+      exportActiveNote();
+    } else if (key === 'n') {
+      event.preventDefault();
+      newDocument();
+    }
+  });
+}
+
 function observeGraphResize() {
   const onResize = debounce(() => {
     state.graphSignature = null;
@@ -1122,6 +1245,7 @@ function observeGraphResize() {
 
 function boot() {
   bindEvents();
+  bindGlobalShortcuts();
   const restored = restoreVault();
 
   if (restored) {

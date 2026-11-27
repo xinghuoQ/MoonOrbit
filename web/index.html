@@ -44,16 +44,24 @@
       </div>
 
       <div class="left-actions">
-        <button id="new-note-btn" type="button" class="btn btn-primary">+ 新建文档</button>
+        <button id="new-note-btn" type="button" class="btn btn-primary" title="新建文档（Ctrl+N）" aria-keyshortcuts="Control+N Meta+N">+ 新建文档</button>
         <button id="new-folder-btn" type="button" class="btn btn-soft">+ 新建文件夹</button>
       </div>
 
       <div class="left-actions left-actions-secondary">
         <button id="import-btn" type="button" class="btn btn-soft">导入 .md</button>
-        <button id="export-btn" type="button" class="btn btn-soft">导出 .md</button>
+        <button id="export-btn" type="button" class="btn btn-soft" title="导出当前文档（Ctrl+S）" aria-keyshortcuts="Control+S Meta+S">导出 .md</button>
         <button id="reset-sample-btn" type="button" class="btn btn-soft">重置示例</button>
       </div>
       <input id="import-input" type="file" accept=".md,text/markdown" multiple hidden>
+
+      <div class="tag-filter">
+        <div class="tag-filter-head">
+          <span>标签筛选</span>
+          <span id="tag-filter-state" class="tag-filter-state">全部</span>
+        </div>
+        <div id="tag-bar" class="tag-bar" role="group" aria-label="按标签筛选文档"></div>
+      </div>
 
       <div class="section-head">
         <span>资源管理器</span>
